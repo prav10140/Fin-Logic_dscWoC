@@ -1,42 +1,52 @@
 // Firebase Client Configuration
-// Updated with actual credentials
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDuNxn6deSyUagKyH3cASMkPYf4_6HqKFc",
-  authDomain: "fin-logic.firebaseapp.com",
-  projectId: "fin-logic",
-  storageBucket: "fin-logic.firebasestorage.app",
-  messagingSenderId: "373355368486",
-  appId: "1:373355368486:web:17199fd2bc1a0d12dc16e7",
-  measurementId: "G-QWSS0HF926"
-};
-
-// Check if Firebase is configured
-const isFirebaseConfigured = true;
+// Fetched dynamically to keep keys secure
 
 let auth = null;
 let db = null;
 let currentUser = null;
+let isFirebaseConfigured = false;
 
-if (isFirebaseConfigured && typeof firebase !== 'undefined') {
-  // Initialize Firebase
-  firebase.initializeApp(firebaseConfig);
-  auth = firebase.auth();
-  db = firebase.firestore();
+// Initialize Firebase
+async function initFirebase() {
+    try {
+        const response = await fetch('/api/firebase-config');
+        if (!response.ok) throw new Error('Failed to fetch config');
+        
+        const firebaseConfig = await response.json();
+        
+        if (!firebaseConfig.apiKey) {
+            console.warn("⚠️ Firebase configuration missing");
+            return;
+        }
 
-  // Auth state observer
-  auth.onAuthStateChanged((user) => {
-    currentUser = user;
-    updateAuthUI(user);
-  });
-} else {
-  console.warn("⚠️  Firebase is not configured. Using placeholder mode.");
+        if (typeof firebase !== 'undefined') {
+            firebase.initializeApp(firebaseConfig);
+            auth = firebase.auth();
+            db = firebase.firestore();
+            isFirebaseConfigured = true;
+            
+            console.log("✅ Firebase initialized successfully");
+
+            // Auth state observer
+            auth.onAuthStateChanged((user) => {
+                currentUser = user;
+                if (typeof updateAuthUI === 'function') {
+                    updateAuthUI(user);
+                }
+            });
+        }
+    } catch (error) {
+        console.warn("⚠️ Error initializing Firebase:", error);
+    }
 }
+
+// Start initialization
+initFirebase();
 
 // Google Sign In
 async function signInWithGoogle() {
-  if (!isFirebaseConfigured) {
-    alert("Firebase is not configured yet. Please add your Firebase credentials.");
+  if (!isFirebaseConfigured || !auth) {
+    alert("Firebase is initializing or not configured. Please wait a moment.");
     return null;
   }
   
@@ -53,7 +63,7 @@ async function signInWithGoogle() {
 
 // Sign Out
 async function signOut() {
-  if (!isFirebaseConfigured) return;
+  if (!isFirebaseConfigured || !auth) return;
   
   try {
     await auth.signOut();
@@ -66,7 +76,7 @@ async function signOut() {
 function updateAuthUI(user) {
   const loginBtn = document.getElementById('loginBtn');
   const userProfile = document.querySelector('.user-profile');
-  const historyBtn = document.querySelector('.btn-history');
+  const historyBtn = document.getElementById('historyBtn');
   
   if (user) {
     // User is signed in
@@ -89,7 +99,7 @@ function updateAuthUI(user) {
 
 // Save report to Firestore
 async function saveReport(reportData) {
-  if (!isFirebaseConfigured || !currentUser) {
+  if (!isFirebaseConfigured || !currentUser || !db) {
     console.log("Cannot save: Firebase not configured or user not signed in");
     return null;
   }
@@ -113,7 +123,7 @@ async function saveReport(reportData) {
 
 // Fetch user's report history
 async function fetchHistory() {
-  if (!isFirebaseConfigured || !currentUser) {
+  if (!isFirebaseConfigured || !currentUser || !db) {
     return [];
   }
   
@@ -141,7 +151,7 @@ async function fetchHistory() {
 
 // Get specific report by ID
 async function getReport(reportId) {
-  if (!isFirebaseConfigured || !currentUser) {
+  if (!isFirebaseConfigured || !currentUser || !db) {
     return null;
   }
   
