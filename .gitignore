@@ -1,0 +1,25 @@
+
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment Variables & Secrets
+.env
+serviceAccountKey.json
+*.pem
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+
+# Debug scripts
+debug_gemini.js
+list_models_debug.js
