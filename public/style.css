@@ -95,34 +95,29 @@ body {
 
 /* --- Navbar --- */
 .navbar {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
-    max-width: 1000px;
+    position: sticky;
+    top: 0;
+    left: 0;
+    right: 0;
     height: 70px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 2rem;
-    background: rgba(20, 20, 30, 0.6);
+    padding: 0 3rem;
+    background: rgba(9, 9, 11, 0.8);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 20px;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 1000;
 }
 
 .logo {
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: 700;
     display: flex;
     align-items: center;
     gap: 10px;
-    background: linear-gradient(135deg, white, var(--text-muted));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    color: white;
+    letter-spacing: -0.5px;
 }
 
 .shield {
@@ -130,6 +125,12 @@ body {
     filter: drop-shadow(0 0 10px var(--primary-glow));
     -webkit-text-fill-color: initial;
     /* Reset gradient for emoji */
+}
+
+.nav-links {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
 }
 
 /* --- Buttons --- */
