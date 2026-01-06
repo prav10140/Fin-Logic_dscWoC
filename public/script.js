@@ -44,6 +44,7 @@ function handleFile(file) {
 }
 
 // Analyze
+// Analyze
 analyzeBtn.addEventListener('click', async () => {
     // Validation
     if (activeMode === 'upload' && !selectedFile) {
@@ -68,9 +69,9 @@ analyzeBtn.addEventListener('click', async () => {
         if (activeMode === 'upload') {
             const formData = new FormData();
             formData.append('document', selectedFile);
-            response = await fetch('/analyze', { method: 'POST', body: formData });
+            response = await fetch('/api/analyze-document', { method: 'POST', body: formData });
         } else {
-            response = await fetch('/analyze', {
+            response = await fetch('/api/analyze-document', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ text: textInput.value })
@@ -84,14 +85,14 @@ analyzeBtn.addEventListener('click', async () => {
         const data = await response.json();
 
         if (data.success) {
-            renderResults(data.analysis);
+            renderResults(data.results, data.source);
             loader.classList.add('hidden');
             analysisContainer.classList.remove('hidden');
             
+            // Save report to Firebase (simplified for now)
             // Save report to Firebase
-            const inputText = activeMode === 'upload' ? data.textPreview : textInput.value;
-            const fileName = activeMode === 'upload' ? selectedFile?.name : null;
-            await saveCurrentReport(data.analysis, inputText, activeMode, fileName);
+            const inputText = activeMode === 'upload' ? "PDF Upload" : textInput.value;
+            await saveCurrentReport(data.results, inputText, activeMode, null);
         } else {
             throw new Error(data.error || 'Analysis failed');
         }
@@ -106,84 +107,95 @@ analyzeBtn.addEventListener('click', async () => {
     }
 });
 
-// Error display helper
-function showError(message) {
-    const errorDiv = document.createElement('div');
-    errorDiv.className = 'error-toast';
-    errorDiv.textContent = message;
-    document.body.appendChild(errorDiv);
-    
-    setTimeout(() => errorDiv.classList.add('show'), 10);
-    setTimeout(() => {
-        errorDiv.classList.remove('show');
-        setTimeout(() => errorDiv.remove(), 300);
-    }, 4000);
+function parseAnalysisText(text) {
+    const result = {};
+    const lines = text.split('\n');
+    let currentKey = null;
+
+    lines.forEach(line => {
+        if (line.includes(':')) {
+            const [key, ...val] = line.split(':');
+            currentKey = key.trim().toLowerCase();
+            result[currentKey] = val.join(':').trim();
+        } else if (currentKey && line.trim()) {
+            result[currentKey] += ' ' + line.trim();
+        }
+    });
+    return result;
 }
 
-// Success display helper
-function showSuccess(message) {
-    const successDiv = document.createElement('div');
-    successDiv.className = 'success-toast';
-    successDiv.textContent = message;
-    document.body.appendChild(successDiv);
-    
-    setTimeout(() => successDiv.classList.add('show'), 10);
-    setTimeout(() => {
-        successDiv.classList.remove('show');
-        setTimeout(() => successDiv.remove(), 300);
-    }, 5000);
-}
-
-function renderResults(risks) {
+function renderResults(risks, source) {
     analysisContent.innerHTML = '';
+    
+    if (!risks || risks.length === 0) {
+        analysisContent.innerHTML = '<div class="card safe"><h3>✅ No apparent risks found</h3><p>The automated scan did not detect common risky patterns.</p></div>';
+        return;
+    }
 
     risks.forEach((risk, index) => {
         const card = document.createElement('div');
         
-        // Determine CSS class based on risk level
-        let cssClass = 'safe';
-        if (risk.riskLevel === 'High') cssClass = 'high-risk';
-        if (risk.riskLevel === 'Medium') cssClass = 'med-risk';
+        // Parse the text analysis if available
+        let parsed = {};
+        if (risk.analysis && !risk.analysis.includes("AI Analysis Failed")) {
+            parsed = parseAnalysisText(risk.analysis);
+        }
+
+        // Determine CSS class
+        let cssClass = 'med-risk';
+        if (risk.analysis && risk.analysis.toLowerCase().includes('high risk')) cssClass = 'high-risk';
+        if (risk.riskType === 'High') cssClass = 'high-risk';
 
         card.className = `card ${cssClass}`;
         card.style.animationDelay = `${index * 0.1}s`;
 
+        // Validation status logic
+        const confidence = risk.validation ? risk.validation : "Not confident — please verify manually.";
+        const isConfidenceWarning = !confidence.includes("Correct");
+
         card.innerHTML = `
             <div class="card-header">
-                <h3>${risk.label}</h3>
-                <span class="status-badge">${risk.riskLevel} Risk</span>
+                <h3>${parsed['risk highlight'] || risk.riskType || 'Risk Detected'}</h3>
+                ${source === 'regex-only' ? '<span class="status-badge warning">Regex Only</span>' : ''}
             </div>
             <div class="card-body">
                 <div class="clause-box">"${risk.clause}"</div>
                 
+                ${parsed['why it is risky'] ? `
                 <div class="friendly-section">
                     <div class="friendly-item">
-                        <h4>1️⃣ What this means</h4>
-                        <p>${risk.whatItMeans || risk.whyRisky}</p>
+                        <h4>Why it is risky</h4>
+                        <p>${parsed['why it is risky']}</p>
                     </div>
-                    
-                    <div class="friendly-item">
-                        <h4>2️⃣ Why it can be harmful</h4>
-                        <p>${risk.whyHarmful || risk.whyRisky}</p>
-                    </div>
-                    
-                    <div class="friendly-item highlight-box">
-                        <h4>3️⃣ If you continue</h4>
-                        <p class="loss-highlight">${risk.realExample || risk.futureLoss}</p>
+                     <div class="friendly-item highlight-box">
+                        <h4>Estimated Loss</h4>
+                        <p class="loss-highlight">${risk.estimatedLoss || parsed['estimated possible loss'] || 'Unknown'}</p>
                     </div>
                 </div>
+                ` : `<p>${risk.analysis}</p>`}
 
-                ${risk.saferAlternative && risk.saferAlternative !== 'N/A' ? `
+                ${parsed['safer rewrite suggestion'] ? `
                 <div class="rewrite-box">
-                    <h4>4️⃣ Safer alternative</h4>
-                    <p>${risk.saferAlternative || risk.rewrite}</p>
+                    <h4>Safer Rewrite</h4>
+                    <p>${parsed['safer rewrite suggestion']}</p>
                 </div>
                 ` : ''}
+
+                <div class="validation-box ${isConfidenceWarning ? 'warning-bg' : 'success-bg'}" style="margin-top: 1rem; padding: 0.5rem; border-radius: 4px; font-size: 0.9rem;">
+                    <strong>Confidence:</strong> ${confidence}
+                </div>
             </div>
         `;
 
         analysisContent.appendChild(card);
     });
+    
+    // Add Disclaimer
+    const disclaimer = document.createElement('div');
+    disclaimer.className = 'disclaimer-note';
+    disclaimer.style = 'grid-column: 1 / -1; text-align: center; margin-top: 2rem; color: #888; font-size: 0.8rem;';
+    disclaimer.innerText = "This tool is educational only — not legal advice.";
+    analysisContent.appendChild(disclaimer);
 }
 
 // Firebase Integration
@@ -194,37 +206,40 @@ const closeHistoryModal = document.getElementById('closeHistoryModal');
 
 // Login button handler
 if (loginBtn) {
+    loginBtn.style.display = 'block'; // Ensure visible initially
     loginBtn.addEventListener('click', async () => {
         await signInWithGoogle();
     });
 }
 
 // Gemini Test button handler
-const testGeminiBtn = document.getElementById('testGeminiBtn');
-if (testGeminiBtn) {
-    testGeminiBtn.addEventListener('click', async () => {
-        testGeminiBtn.disabled = true;
-        testGeminiBtn.textContent = '🔄 Testing...';
+// Groq Test button handler
+const testGroqBtn = document.getElementById('testGroqBtn');
+if (testGroqBtn) {
+    testGroqBtn.addEventListener('click', async () => {
+        testGroqBtn.disabled = true;
+        testGroqBtn.textContent = '🔄 Testing...';
         
         try {
-            const response = await fetch('/api/test-gemini');
+            const response = await fetch('/api/test-groq');
             const data = await response.json();
             
             if (data.success) {
-                showSuccess(`✅ Gemini API Working!\n\n${data.response}`);
+                showSuccess(`✅ Groq API Working!\n\n${data.response}`);
             } else {
                 // Show specific error from server, or fallback
-                showError(`❌ ${data.error || data.message || 'Gemini API not configured'}`);
+                showError(`❌ ${data.error || data.message || 'Groq API not configured'}`);
             }
         } catch (error) {
             showError(`❌ Test failed: ${error.message}`);
         } finally {
-            testGeminiBtn.disabled = false;
-            testGeminiBtn.textContent = '🤖 Test AI';
+            testGroqBtn.disabled = false;
+            testGroqBtn.textContent = '⚡ Test Groq';
         }
     });
 }
 
+// History button handler
 // History button handler
 if (historyBtn) {
     historyBtn.addEventListener('click', async () => {
@@ -253,9 +268,17 @@ historyModal?.addEventListener('click', (e) => {
 });
 
 // Save report after analysis
+// Save report after analysis
 async function saveCurrentReport(analysis, inputText, inputType, fileName) {
-    if (!currentUser || !isFirebaseConfigured) {
-        console.log('Skipping save: Not signed in or Firebase not configured');
+    if (!currentUser) {
+        alert('ℹ️ Tip: Sign in with Google to save your analysis history!');
+        console.log('Skipping save: Not signed in');
+        return;
+    }
+    
+    if (!isFirebaseConfigured) {
+        console.error('Skipping save: Firebase not configured');
+        alert('⚠️ Error: Firebase is not configured correctly. Data cannot be saved.');
         return;
     }
     
@@ -268,9 +291,15 @@ async function saveCurrentReport(analysis, inputText, inputType, fileName) {
     };
     
     try {
+        // Use client-side save which handles Firestore SDK
         const saved = await saveReport(reportData);
         if (saved) {
             console.log('Report saved successfully');
+            // Show simple toast or log
+            const btn = document.getElementById('historyBtn');
+            const originalText = btn.textContent;
+            btn.textContent = '✅ Saved';
+            setTimeout(() => btn.textContent = originalText, 2000);
         }
     } catch (error) {
         console.error('Failed to save report:', error);
