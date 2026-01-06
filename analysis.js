@@ -1,38 +1,49 @@
 const Tesseract = require('tesseract.js');
+const fs = require('fs');
+const pdfParse = require('pdf-parse');
+const path = require('path');
 
 /**
- * Perform OCR on an image file.
- * @param {string} imagePath - Path to the image file.
+ * Perform extraction based on file type.
+ * @param {string} filePath - Path to the file.
  * @returns {Promise<string>} - Extracted text.
  */
-async function extractText(imagePath) {
-  console.log(`[OCR] Starting extraction for: ${imagePath}`);
+async function extractText(filePath) {
+  console.log(`[OCR] Starting extraction for: ${filePath}`);
   const startTime = Date.now();
   
   try {
-    const { data: { text } } = await Tesseract.recognize(
-      imagePath,
-      'eng',
-      { 
-        logger: m => {
-          if (m.status === 'recognizing text') {
-            console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`);
-          }
-        }
-      }
-    );
+    const ext = path.extname(filePath).toLowerCase();
+    let text = '';
+
+    if (ext === '.pdf') {
+        // Handle PDF
+        console.log('[OCR] Detected PDF. Using pdf-parse...');
+        const buffer = fs.readFileSync(filePath);
+        const result = await pdfParse(buffer);
+        text = result.text;
+    } else {
+        // Handle Image (default Tesseract)
+        console.log('[OCR] Detected Image. Using Tesseract...');
+        const { data: { text: ocrText } } = await Tesseract.recognize(
+            filePath,
+            'eng',
+            { logger: m => { if (m.status === 'recognizing text') console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`); }}
+        );
+        text = ocrText;
+    }
     
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`[OCR] Complete in ${duration}s. Extracted ${text.length} characters.`);
     
     if (!text || text.trim().length === 0) {
-      throw new Error('No text could be extracted from the image. Please ensure the image contains readable text.');
+      throw new Error('No text could be extracted. The file might be empty or contain non-selectable text (scanned PDF without OCR).');
     }
     
     return text;
   } catch (error) {
     console.error('[OCR] Error:', error);
-    throw new Error(`OCR failed: ${error.message}`);
+    throw new Error(`Extraction failed: ${error.message}`);
   }
 }
 
@@ -90,7 +101,7 @@ async function analyzeText(text) {
       saferAlternative: 'The service should stop automatically unless you choose to continue. Cancellation should be easy and instant.'
     },
     {
-      keywords: ['without prior notice', 'without notice', 'may change at any time', 'at our discretion'],
+      keywords: ['without prior notice', 'without notice', 'may change at any time', 'at our discretion', 'sole discretion', 'without prior intimation', 'reserves the right to modify'],
       label: 'Forced Consent',
       riskLevel: 'Medium',
       whatItMeans: 'They can change the rules, prices, or terms whenever they want without telling you first.',
@@ -116,7 +127,7 @@ async function analyzeText(text) {
       saferAlternative: 'Late fees should be small (max ₹100) and only charged after a grace period. You should get a reminder before any penalty.'
     },
     {
-      keywords: ['dynamic interest', 'variable interest', 'interest may increase', 'rate may change', 'adjustable rate'],
+      keywords: ['dynamic interest', 'variable interest', 'interest may increase', 'rate may change', 'adjustable rate', 'modify the annual percentage rate', 'modify the apr'],
       label: 'Hidden Fee',
       riskLevel: 'High',
       whatItMeans: 'The interest rate on your loan can go up at any time, making you pay more money back.',
@@ -131,6 +142,15 @@ async function analyzeText(text) {
         return 'Interest increases could cost you ₹50,000 to ₹5,00,000 extra over the loan period.';
       },
       saferAlternative: 'Interest rates should be locked in and can\'t change. Any rate changes should need your written approval.'
+    },
+    {
+      keywords: ['share anonymized data', 'third-party marketing', 'share your data', 'irrevocable license', 'sell your info', 'share credit history'],
+      label: 'Data Privacy',
+      riskLevel: 'High',
+      whatItMeans: 'You are giving them permission to share or sell your personal and financial details to other companies for ads or credit scoring.',
+      whyHarmful: 'Your private data (spending habits, credit score) could be sold to advertisers or insurers, leading to spam or higher rates elsewhere.',
+      estimator: () => 'Loss of privacy and potential increase in spam/targeted ads.',
+      saferAlternative: 'Data sharing should be optional (opt-in) and not required for using the service.'
     }
   ];
   
