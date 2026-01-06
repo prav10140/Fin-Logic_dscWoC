@@ -23,3 +23,5 @@ uploads/
 # Debug scripts
 debug_gemini.js
 list_models_debug.js
+eng.traineddata
+database/

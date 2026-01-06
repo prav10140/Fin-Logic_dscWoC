@@ -11,28 +11,20 @@ To enable Firebase:
 */
 
 
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT 
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT) 
+  : require('./serviceAccountKey.json');
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
+try {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount)
+  });
+  console.log("✅ Firebase Admin initialized successfully");
+} catch (error) {
+  console.error("❌ Firebase Admin initialization failed:", error);
+}
 
 const db = admin.firestore();
 const auth = admin.auth();
 
-module.exports = { admin, db, auth };
-
-
-// PLACEHOLDER MODE - Firebase not active
-console.log("⚠️  Firebase Admin is in PLACEHOLDER mode");
-console.log("📝 To enable:");
-console.log("   1. Create Firebase project at https://console.firebase.google.com");
-console.log("   2. Download serviceAccountKey.json");
-console.log("   3. Uncomment code in firebase-config.js");
-
-module.exports = { 
-  admin: null, 
-  db: null, 
-  auth: null,
-  isConfigured: false 
-};
+module.exports = { admin, db, auth, isConfigured: true };

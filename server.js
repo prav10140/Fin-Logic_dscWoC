@@ -1,8 +1,11 @@
+
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const cors = require('cors');
-const { extractText, analyzeText } = require('./analysis');
+const { extractText } = require('./analysis');
+const { getFlaggedClauses } = require('./preprocessing');
+const { analyzeWithGroq, analyzeClauseRisk, estimateLoss, validateExplanation, testGroqConnection, isConfigured: isGroqConfigured } = require('./groq-service');
 
 // Load environment variables from .env file
 require('dotenv').config();
@@ -51,8 +54,17 @@ app.post('/analyze', upload.single('document'), async (req, res) => {
       return res.status(400).json({ error: 'No file or text provided.' });
     }
 
-    // 2. LLM Analysis (Placeholder)
-    const analysis = await analyzeText(text);
+    // 2. AI Analysis using Groq
+    let analysis = [];
+    if (isGroqConfigured) {
+        console.log("Analyzing with Groq...");
+        analysis = await analyzeWithGroq(text);
+    } else {
+        // Fallback to basic rule-based if Groq not configured
+        console.log("Groq not configured, using legacy analysis");
+        const { analyzeText: legacyAnalyze } = require('./analysis');
+        analysis = await legacyAnalyze(text);
+    }
 
     res.json({
       success: true,
@@ -62,8 +74,82 @@ app.post('/analyze', upload.single('document'), async (req, res) => {
 
   } catch (error) {
     console.error('Processing Error:', error);
-    res.status(500).json({ error: 'Failed to process document.' });
+    res.status(500).json({ error: 'Failed to process document: ' + error.message });
   }
+});
+
+// New Detailed Analysis Route
+app.post('/api/analyze-document', upload.single('document'), async (req, res) => {
+    let text = '';
+    
+    try {
+        if (req.file) {
+            text = await extractText(req.file.path);
+        } else if (req.body.text) {
+            text = req.body.text;
+        } else {
+            return res.status(400).json({ error: 'No text or file provided' });
+        }
+
+        // 1. Run Regex Layer
+        const flaggedClauses = getFlaggedClauses(text);
+        console.log(`Found ${flaggedClauses.length} suspicious clauses via regex.`);
+
+        if (!isGroqConfigured) {
+             // Return just the regex matches if Groq is down/missing
+            return res.json({ 
+                success: true, 
+                source: 'regex-only',
+                results: flaggedClauses.map(f => ({ clause: f.clause, analysis: `Risk Detected: ${f.risk} (AI Analysis Unavailable)` }))
+            });
+        }
+
+        // 2. Groq Analysis for each flagged clause
+        // Using Promise.all for parallel execution
+        const analysisPromises = flaggedClauses.map(async (item) => {
+            try {
+                // Run analysis, loss estimation, and subsequent validation
+                // We must run analysis first to have something to validate
+                const analysisText = await analyzeClauseRisk(item.clause);
+                const lossEstimate = await estimateLoss(item.clause);
+
+                // Validation Step
+                const validationResult = await validateExplanation(item.clause, analysisText);
+                const isTrusted = validationResult.trim().includes("Correct");
+
+                const finalAnalysis = isTrusted 
+                    ? analysisText 
+                    : "Not confident — please verify manually.\n\n" + analysisText; // Keeping original text but with warning
+
+                return {
+                    clause: item.clause,
+                    riskType: item.risk, // from regex
+                    analysis: finalAnalysis,
+                    estimatedLoss: lossEstimate,
+                    validation: validationResult.trim() // Optional: include validation status for debug
+                };
+            } catch (err) {
+                console.error(`Failed to analyze clause: "${item.clause.substring(0, 30)}..."`, err);
+                return {
+                    clause: item.clause,
+                    riskType: item.risk,
+                    analysis: "AI Analysis Failed for this clause.",
+                    estimatedLoss: "Unknown"
+                };
+            }
+        });
+
+        const results = await Promise.all(analysisPromises);
+
+        res.json({
+            success: true,
+            results: results
+        });
+
+    } catch (error) {
+        console.error('Document Analysis Error:', error);
+        res.status(500).json({ error: error.message });
+    }
 });
 
 // Firebase endpoints (optional - only work if Firebase is configured)
@@ -142,32 +228,28 @@ app.get('/api/report/:userId/:reportId', async (req, res) => {
   }
 });
 
-// Gemini API Test Route
-const { analyzeWithGemini, isConfigured: isGeminiConfigured } = require('./gemini-service');
-
-app.get('/api/test-gemini', async (req, res) => {
-  if (!isGeminiConfigured) {
+// Groq API Test Route
+app.get('/api/test-groq', async (req, res) => {
+  if (!isGroqConfigured) {
     return res.json({
       success: false,
-      message: 'Gemini API not configured. Set GEMINI_API_KEY environment variable.'
+      message: 'Groq API not configured. Set GROQ_API_KEY environment variable.'
     });
   }
 
-  try {
-    const testPrompt = 'Say "Hello from Gemini!" and explain in one sentence what you can do.';
-    const response = await analyzeWithGemini(testPrompt);
-    
-    res.json({
-      success: true,
-      message: 'Gemini API is working!',
-      response: response
-    });
-  } catch (error) {
-    console.error('Gemini test error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message
-    });
+  const result = await testGroqConnection();
+  
+  if (result.success) {
+      res.json({
+          success: true,
+          message: 'Groq API is working!',
+          response: result.message
+      });
+  } else {
+      res.status(500).json({
+          success: false,
+          error: result.error
+      });
   }
 });
 
