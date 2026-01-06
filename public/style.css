@@ -486,6 +486,43 @@ button {
     }
 }
 
+/* --- Footer --- */
+.disclaimer-footer {
+    margin-top: 6rem;
+    padding: 3rem 2rem;
+    background: rgba(20, 20, 30, 0.4);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.disclaimer-content {
+    max-width: 800px;
+    margin: 0 auto;
+    text-align: center;
+}
+
+.disclaimer-icon {
+    font-size: 3rem;
+    margin: 0 0 1rem 0;
+    filter: drop-shadow(0 0 10px rgba(251, 191, 36, 0.5));
+}
+
+.disclaimer-text {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.8;
+    margin: 0;
+}
+
+.disclaimer-text strong {
+    color: #fbbf24;
+    font-size: 1.1rem;
+    display: block;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
 /* --- Mobile --- */
 @media (max-width: 768px) {
     .page-header h1 {
