@@ -213,31 +213,7 @@ if (loginBtn) {
 }
 
 // Gemini Test button handler
-// Groq Test button handler
-const testGroqBtn = document.getElementById('testGroqBtn');
-if (testGroqBtn) {
-    testGroqBtn.addEventListener('click', async () => {
-        testGroqBtn.disabled = true;
-        testGroqBtn.textContent = '🔄 Testing...';
-        
-        try {
-            const response = await fetch('/api/test-groq');
-            const data = await response.json();
-            
-            if (data.success) {
-                showSuccess(`✅ Groq API Working!\n\n${data.response}`);
-            } else {
-                // Show specific error from server, or fallback
-                showError(`❌ ${data.error || data.message || 'Groq API not configured'}`);
-            }
-        } catch (error) {
-            showError(`❌ Test failed: ${error.message}`);
-        } finally {
-            testGroqBtn.disabled = false;
-            testGroqBtn.textContent = '⚡ Test Groq';
-        }
-    });
-}
+
 
 // History button handler
 // History button handler

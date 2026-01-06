@@ -95,17 +95,23 @@ body {
 
 /* --- Navbar --- */
 .navbar {
-    height: 80px;
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 1000px;
+    height: 70px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0 3rem;
-    background: rgba(9, 9, 11, 0.6);
-    backdrop-filter: blur(16px);
-    border-bottom: 1px solid var(--glass-border);
-    position: sticky;
-    top: 0;
-    z-index: 100;
+    padding: 0 2rem;
+    background: rgba(20, 20, 30, 0.6);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
 }
 
 .logo {
@@ -133,8 +139,7 @@ button {
 }
 
 .btn-login,
-.btn-analyze,
-.btn-test-groq {
+.btn-analyze {
     background: rgba(255, 255, 255, 0.05);
     color: white;
     border: 1px solid var(--glass-border);
@@ -146,8 +151,7 @@ button {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
 }
 
-.btn-login:hover,
-.btn-test-groq:hover {
+.btn-login:hover {
     background: rgba(255, 255, 255, 0.1);
     transform: translateY(-2px);
     box-shadow: 0 0 20px var(--primary-glow);
