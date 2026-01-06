@@ -2,6 +2,7 @@
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const cors = require('cors');
 const { extractText } = require('./analysis');
 const { getFlaggedClauses } = require('./preprocessing');
@@ -17,6 +18,12 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json()); // Enable JSON body parsing for text input
 app.use(express.static('public')); // Serve frontend files
+
+// Ensure uploads directory exists
+const uploadDir = 'uploads';
+if (!fs.existsSync(uploadDir)){
+    fs.mkdirSync(uploadDir);
+}
 
 // Multer storage config
 const storage = multer.diskStorage({
