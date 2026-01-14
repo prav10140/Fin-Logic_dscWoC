@@ -225,7 +225,15 @@ This project is licensed under the **MIT License**.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+We love your input! We want to make contributing to Fin-Logic as easy and transparent as possible, whether it's:
+
+- Reporting a bug
+- Discussing the current state of the code
+- Submitting a fix
+- Proposing new features
+
+Please compile with our [Contribution Guidelines](CONTRIBUTING.md) before submitting a Pull Request.
+
 
 ---
 
