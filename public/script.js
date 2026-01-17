@@ -44,7 +44,6 @@ function handleFile(file) {
 }
 
 // Analyze
-// Analyze
 analyzeBtn.addEventListener('click', async () => {
     // Validation
     if (activeMode === 'upload' && !selectedFile) {
@@ -89,7 +88,6 @@ analyzeBtn.addEventListener('click', async () => {
             loader.classList.add('hidden');
             analysisContainer.classList.remove('hidden');
             
-            // Save report to Firebase (simplified for now)
             // Save report to Firebase
             const inputText = activeMode === 'upload' ? "PDF Upload" : textInput.value;
             await saveCurrentReport(data.results, inputText, activeMode, null);
@@ -106,6 +104,10 @@ analyzeBtn.addEventListener('click', async () => {
         analyzeBtn.textContent = 'Analyze Risk Level';
     }
 });
+
+function showError(msg) {
+    alert(msg); // Simplified error handling
+}
 
 function parseAnalysisText(text) {
     const result = {};
@@ -167,7 +169,7 @@ function renderResults(risks, source) {
                         <h4>Why it is risky</h4>
                         <p>${parsed['why it is risky']}</p>
                     </div>
-                     <div class="friendly-item highlight-box">
+                      <div class="friendly-item highlight-box">
                         <h4>Estimated Loss</h4>
                         <p class="loss-highlight">${risk.estimatedLoss || parsed['estimated possible loss'] || 'Unknown'}</p>
                     </div>
@@ -212,10 +214,6 @@ if (loginBtn) {
     });
 }
 
-// Gemini Test button handler
-
-
-// History button handler
 // History button handler
 if (historyBtn) {
     historyBtn.addEventListener('click', async () => {
@@ -244,17 +242,14 @@ historyModal?.addEventListener('click', (e) => {
 });
 
 // Save report after analysis
-// Save report after analysis
 async function saveCurrentReport(analysis, inputText, inputType, fileName) {
     if (!currentUser) {
-        alert('ℹ️ Tip: Sign in with Google to save your analysis history!');
         console.log('Skipping save: Not signed in');
         return;
     }
     
     if (!isFirebaseConfigured) {
         console.error('Skipping save: Firebase not configured');
-        alert('⚠️ Error: Firebase is not configured correctly. Data cannot be saved.');
         return;
     }
     
@@ -267,11 +262,8 @@ async function saveCurrentReport(analysis, inputText, inputType, fileName) {
     };
     
     try {
-        // Use client-side save which handles Firestore SDK
         const saved = await saveReport(reportData);
         if (saved) {
-            console.log('Report saved successfully');
-            // Show simple toast or log
             const btn = document.getElementById('historyBtn');
             const originalText = btn.textContent;
             btn.textContent = '✅ Saved';
@@ -357,7 +349,6 @@ async function viewReport(reportId) {
     // Optionally populate input field
     if (report.inputType === 'paste' && report.inputText) {
         textInput.value = report.inputText;
-        // Switch to paste tab
         tabs.forEach(t => t.classList.remove('active'));
         tabContents.forEach(c => c.classList.remove('active'));
         document.querySelector('[data-tab="paste"]').classList.add('active');
@@ -365,3 +356,28 @@ async function viewReport(reportId) {
         activeMode = 'paste';
     }
 }
+
+// --- NEW: Theme Toggle Logic ---
+const themeBtn = document.getElementById('themeToggle');
+const body = document.body;
+
+// Check local storage for theme preference on load
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme === 'light') {
+    body.classList.add('light-mode');
+    themeBtn.textContent = '🌙'; // Switch icon to moon
+} else {
+    themeBtn.textContent = '☀️'; // Default sun
+}
+
+themeBtn.addEventListener('click', () => {
+    body.classList.toggle('light-mode');
+    
+    if (body.classList.contains('light-mode')) {
+        themeBtn.textContent = '🌙';
+        localStorage.setItem('theme', 'light');
+    } else {
+        themeBtn.textContent = '☀️';
+        localStorage.setItem('theme', 'dark');
+    }
+});
